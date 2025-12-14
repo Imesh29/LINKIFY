@@ -1,0 +1,27 @@
+{
+  "name": "linkify",
+  "version": "1.0.0",
+  "description": "LINKIFY is a full-featured social media backend application built using Node.js, Express, and MongoDB. It supports user authentication with tokens, follower–following requests (accept/reject), post creation with likes and comments, email notifications, private and group chats, and real-time messaging powered by Socket.IO.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Imesh29/LINKIFY.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Imesh29/LINKIFY/issues"
+  },
+  "homepage": "https://github.com/Imesh29/LINKIFY#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "mongoose": "^9.0.1"
+  }
+}
