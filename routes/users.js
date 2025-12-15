@@ -55,4 +55,34 @@ router.post("/", async (req, res) => {
   res.status(201).json(token);
 });
 
+//User login
+router.post("/login",async (req,res) => {
+    const { username,password } = req.body;
+
+    //check the whether username and password entered
+    if(!username || !password){
+        return res.status(400).json({success:false,message: "Please provide the username and password!"});
+    }
+
+    //check whether the username and password are valid
+    const user = await User.findOne({ username});
+    if(!user){
+        res.status(401).json({success:false,message: "Invalid credentials!" });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if(!validPassword){
+        return res.status(401).json({success:false, message: "Invalid credentilas!"});
+    }
+
+    //Generate the token
+    const token = generateToken({
+        _id: user._id,
+        username: user.username,
+    });
+
+    res.json(token);
+})
+
+
 module.exports = router;
