@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 
 const User = require("../models/users");
+const auth = require("../middleware/auth");
 
 const generateToken = (data) => {
   return jwt.sign(data, process.env.JWT_KEY);
@@ -83,6 +84,17 @@ router.post("/login",async (req,res) => {
 
     res.json(token);
 })
+
+//Get current loged in users
+router.get("/",auth, async (req,res) =>{
+    const user = await User.findById(req.user._id).select("-password");
+
+    if (!user) {
+    return res.status(404).json({ success: false, message: "User not found!" });
+    }
+
+    res.json(user);
+});
 
 
 module.exports = router;
