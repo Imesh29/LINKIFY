@@ -148,4 +148,31 @@ router.post("/reset-password", async (req, res) => {
 });
 
 
+router.post("/:userId/follow", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const currentUserId = req.user._id;
+
+  if (userId === currentUserId)
+    return res.status(400).json({ message: "You can't follow yourself!" });
+
+  const userToFollow = await User.findById(userId);
+  if (!userToFollow)
+    return res.status(404).json({ message: "User not found!" });
+
+  const currentUser = await User.findById(currentUserId);
+  if (!currentUser) return res.status(404).json({ message: "User not found!" });
+
+  if (userToFollow.isPrivate) {
+    //  Logic for Private Account
+    if (userToFollow.followRequests.includes(currentUserId)) {
+      return res.status(400).json({ message: "Follow request already sent!" });
+    } else {
+      userToFollow.followRequests.push(currentUserId);
+      await userToFollow.save();
+      return res.json({ message: "Follow request sent." });
+    }
+  }
+}); 
+
+
 module.exports = router;
