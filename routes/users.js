@@ -171,6 +171,17 @@ router.post("/:userId/follow", auth, async (req, res) => {
       await userToFollow.save();
       return res.json({ message: "Follow request sent." });
     }
+  } else {
+    // Logic for Public Account
+    if (userToFollow.followers.includes(currentUserId)) {
+      return res.status(400).json({ message: "Already following the user!" });
+    } else {
+      userToFollow.followers.push(currentUserId);
+      currentUser.following.push(userId);
+      await userToFollow.save();
+      await currentUser.save();
+      return res.json({ message: "User followed successfully." });
+    }
   }
 }); 
 
