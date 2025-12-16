@@ -5,6 +5,7 @@ const router = express.Router();
 
 const User = require("../models/users");
 const auth = require("../middleware/auth");
+const sendSMTPEmail = require("../config/smtp");
 
 
 const generateToken = (data) => {
@@ -58,33 +59,53 @@ router.post("/", async (req, res) => {
 });
 
 //User login
-router.post("/login",async (req,res) => {
-    const { username,password } = req.body;
+router.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
 
-    //check the whether username and password entered
-    if(!username || !password){
-        return res.status(400).json({success:false,message: "Please provide the username and password!"});
+    //  Check input
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide the username and password!",
+      });
     }
 
-    //check whether the username and password are valid
-    const user = await User.findOne({ username});
-    if(!user){
-        res.status(401).json({success:false,message: "Invalid credentials!" });
+    //  Find user
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials!",
+      });
     }
 
+    //  Compare password
     const validPassword = await bcrypt.compare(password, user.password);
-    if(!validPassword){
-        return res.status(401).json({success:false, message: "Invalid credentilas!"});
+    if (!validPassword) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials!",
+      });
     }
 
-    //Generate the token
+    //  Generate token
     const token = generateToken({
-        _id: user._id,
-        username: user.username,
+      _id: user._id,
+      username: user.username,
     });
 
-    res.json(token);
-})
+    return res.status(200).json({
+      success: true,
+      token,
+    });
+
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 //Get current loged in users
 router.get("/",auth, async (req,res) =>{
@@ -114,10 +135,47 @@ router.post("/request-password-reset", async (req, res) => {
   user.resetTokenExpires = Date.now() + 60 * 60 * 1000;
   await user.save();
 
+  // Send email with this token
+  const subject = "Password Reset Request for your linkify account";
+  const text = `Click this link to reset your password: https://ourlinkify.com/reset-password?resetToken=${resetToken}`;
+  // sendEmail(user.email, subject, text);
+  sendSMTPEmail(user.email, subject, text);
+
   res.json({
     message: "Password reset link sent to email",
     resetToken: resetToken,
   });
+});
+
+
+router.post("/accept-request/:requesterId", auth, async (req, res) => {
+  const requesterId = req.params.requesterId;
+  const currentUserId = req.user._id;
+
+  if (requesterId === currentUserId)
+    return res.status(400).json({ message: "You can't follow yourself!" });
+
+  const requesterUser = await User.findById(requesterId);
+  if (!requesterUser)
+    return res.status(404).json({ message: "User not found!" });
+
+  const currentUser = await User.findById(currentUserId);
+  if (!currentUser) return res.status(404).json({ message: "User not found!" });
+
+  if (!currentUser.followRequests.includes(requesterId)) {
+    return res.status(400).json({ message: "No follow request found!" });
+  }
+
+  const updatedRequests = currentUser.followRequests.filter(
+    (id) => id.toString() !== requesterId
+  );
+  currentUser.followRequests = updatedRequests;
+  currentUser.followers.push(requesterId);
+  requesterUser.following.push(currentUserId);
+  await currentUser.save();
+  await requesterUser.save();
+
+  res.json({ message: "Follow request accepted" });
 });
 
 
@@ -146,6 +204,7 @@ router.post("/reset-password", async (req, res) => {
 
   res.json({ message: "Password reset successfully!" });
 });
+
 
 
 router.post("/:userId/follow", auth, async (req, res) => {
@@ -185,5 +244,108 @@ router.post("/:userId/follow", auth, async (req, res) => {
   }
 }); 
 
+
+router.post("/reject-request/:requesterId", auth, async (req, res) => {
+  const requesterId = req.params.requesterId;
+  const currentUserId = req.user._id;
+
+  if (requesterId === currentUserId)
+    return res.status(400).json({ message: "You can't follow yourself!" });
+
+  const requesterUser = await User.findById(requesterId);
+  if (!requesterUser)
+    return res.status(404).json({ message: "User not found!" });
+
+  const currentUser = await User.findById(currentUserId);
+  if (!currentUser) return res.status(404).json({ message: "User not found!" });
+
+  if (!currentUser.followRequests.includes(requesterId)) {
+    return res.status(400).json({ message: "No follow request found!" });
+  }
+
+  const updatedRequests = currentUser.followRequests.filter(
+    (id) => id.toString() !== requesterId
+  );
+  currentUser.followRequests = updatedRequests;
+  await currentUser.save();
+
+  res.json({ message: "Follow request rejected" });
+});
+
+
+router.get("/:userId/followers", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const currentUserId = req.user._id;
+
+  const user = await User.findById(userId).populate(
+    "followers",
+    "_id username"
+  );
+  if (!user) return res.status(404).json({ message: "User not found!" });
+
+  const currentUser = await User.findById(currentUserId);
+  if (!currentUser) return res.status(404).json({ message: "User not found!" });
+
+  if (currentUser.following.includes(userId) || !user.isPrivate) {
+    return res.json(user.followers);
+  } else {
+    return res
+      .status(400)
+      .json({ message: "Can't get following list - Account is private." });
+  }
+});
+
+
+router.get("/:userId/following", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const currentUserId = req.user._id;
+
+  const user = await User.findById(userId).populate(
+    "following",
+    "_id username"
+  );
+  if (!user) return res.status(404).json({ message: "User not found!" });
+
+  const currentUser = await User.findById(currentUserId);
+  if (!currentUser) return res.status(404).json({ message: "User not found!" });
+
+  if (currentUser.following.includes(userId) || !user.isPrivate) {
+    return res.json(user.followers);
+  } else {
+    return res
+      .status(400)
+      .json({ message: "Can't get following list - Account is private." });
+  }
+});
+
+
+router.post("/:userId/unfollow", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const currentUserId = req.user._id;
+
+  const userToUnfollow = await User.findById(userId);
+  if (!userToUnfollow)
+    return res.status(404).json({ message: "User not found!" });
+
+  const currentUser = await User.findById(currentUserId);
+  if (!currentUser) return res.status(404).json({ message: "User not found!" });
+
+  if (!userToUnfollow.followers.includes(currentUserId)) {
+    return res
+      .status(400)
+      .json({ message: "User is not available in the followers" });
+  }
+
+  userToUnfollow.followers = userToUnfollow.followers.filter(
+    (id) => id.toString() !== currentUserId
+  );
+  currentUser.following = currentUser.following.filter(
+    (id) => id.toString() !== userId
+  );
+  await userToUnfollow.save();
+  await currentUser.save();
+
+  res.json({ message: "User unfollowed successfully!" });
+});
 
 module.exports = router;

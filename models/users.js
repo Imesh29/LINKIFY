@@ -33,6 +33,9 @@ const userSchema = new mongoose.Schema({
   phoneNumber: { type: String, trim: true },
   resetToken: { type: String },
   resetTokenExpires: { type: Date },
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 });
 
 const User = mongoose.model("User", userSchema);
