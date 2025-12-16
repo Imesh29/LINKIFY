@@ -318,4 +318,34 @@ router.get("/:userId/following", auth, async (req, res) => {
   }
 });
 
+
+router.post("/:userId/unfollow", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const currentUserId = req.user._id;
+
+  const userToUnfollow = await User.findById(userId);
+  if (!userToUnfollow)
+    return res.status(404).json({ message: "User not found!" });
+
+  const currentUser = await User.findById(currentUserId);
+  if (!currentUser) return res.status(404).json({ message: "User not found!" });
+
+  if (!userToUnfollow.followers.includes(currentUserId)) {
+    return res
+      .status(400)
+      .json({ message: "User is not available in the followers" });
+  }
+
+  userToUnfollow.followers = userToUnfollow.followers.filter(
+    (id) => id.toString() !== currentUserId
+  );
+  currentUser.following = currentUser.following.filter(
+    (id) => id.toString() !== userId
+  );
+  await userToUnfollow.save();
+  await currentUser.save();
+
+  res.json({ message: "User unfollowed successfully!" });
+});
+
 module.exports = router;
