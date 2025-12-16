@@ -34,4 +34,20 @@ router.post("/", auth, postUpload.array("media", 10), async (req, res) => {
     .json({ message: "Post uploaded successfully!", post: newPost });
 });
 
+
+router.get("/myposts", auth, async (req, res) => {
+  let { page = 1, limit = 10 } = req.query;
+  page = parseInt(page);
+  limit = parseInt(limit);
+
+  const posts = await Post.find({ user: req.user._id })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .lean();
+
+  
+
+  res.json(posts);
+});
+
 module.exports = router;
