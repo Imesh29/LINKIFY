@@ -273,11 +273,14 @@ router.post("/reject-request/:requesterId", auth, async (req, res) => {
 });
 
 
-router.get("/:userId/following", auth, async (req, res) => {
+router.get("/:userId/followers", auth, async (req, res) => {
   const userId = req.params.userId;
   const currentUserId = req.user._id;
 
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).populate(
+    "followers",
+    "_id username"
+  );
   if (!user) return res.status(404).json({ message: "User not found!" });
 
   const currentUser = await User.findById(currentUserId);
