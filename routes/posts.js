@@ -45,9 +45,9 @@ router.get("/myposts", auth, async (req, res) => {
     .limit(limit)
     .lean();
 
-  
-
-  res.json(posts);
+  const hasNextPage = posts.length === limit ? true : false;
+ 
+  res.json({ posts, page, limit, hasNextPage });
 });
 
 module.exports = router;
