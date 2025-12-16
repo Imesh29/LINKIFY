@@ -295,4 +295,27 @@ router.get("/:userId/followers", auth, async (req, res) => {
   }
 });
 
+
+router.get("/:userId/following", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const currentUserId = req.user._id;
+
+  const user = await User.findById(userId).populate(
+    "following",
+    "_id username"
+  );
+  if (!user) return res.status(404).json({ message: "User not found!" });
+
+  const currentUser = await User.findById(currentUserId);
+  if (!currentUser) return res.status(404).json({ message: "User not found!" });
+
+  if (currentUser.following.includes(userId) || !user.isPrivate) {
+    return res.json(user.followers);
+  } else {
+    return res
+      .status(400)
+      .json({ message: "Can't get following list - Account is private." });
+  }
+});
+
 module.exports = router;
