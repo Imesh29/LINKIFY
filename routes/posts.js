@@ -1,7 +1,10 @@
 const express = require("express");
 const auth = require("../middleware/auth");
+const path = require("path");
 const postUpload = require("../config/multer-upload");
+const fs = require("fs/promises");
 const Post = require("../models/posts");
+const User = require("../models/users");
 const router = express.Router();
 
 //Create a post
@@ -32,6 +35,126 @@ router.post("/", auth, postUpload.array("media", 10), async (req, res) => {
   return res
     .status(201)
     .json({ message: "Post uploaded successfully!", post: newPost });
+});
+
+
+router.get("/myposts", auth, async (req, res) => {
+  let { page = 1, limit = 10 } = req.query;
+  page = parseInt(page);
+  limit = parseInt(limit);
+
+  const posts = await Post.find({ user: req.user._id })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .lean();
+
+  const hasNextPage = posts.length === limit ? true : false;
+ 
+  res.json({ posts, page, limit, hasNextPage });
+});
+
+
+router.get("/following", auth, async (req, res) => {
+  let { page = 1, limit = 10, cursor } = req.query;
+  page = parseInt(page);
+  limit = parseInt(limit);
+
+  const user = await User.findById(req.user._id).select("following");
+
+  let query = { user: { $in: user.following } };
+  if (cursor) {
+    query.createdAt = { $lt: new Date(cursor) };
+  }
+
+  const posts = await Post.find(query)
+    .populate("user", "_id username profileName")
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .lean();
+
+  const nextCursor =
+    posts.length > 0 ? posts[posts.length - 1].createdAt : null;
+  const hasNextPage = posts.length === limit ? true : false;
+
+  res.json({ posts, nextCursor, hasNextPage });
+});
+
+
+router.delete("/:postId", auth, async (req, res) => {
+  const postId = req.params.postId;
+  const userId = req.user._id;
+
+  const post = await Post.findById(postId);
+  if (!post) return res.status(404).json({ message: "Post not found!" });
+
+  if (post.user.toString() !== userId)
+    return res.status(403).json({ message: "Unauthorized to delte this post" });
+
+  post.media.forEach(async (file) => {
+    const filePath = path.join(__dirname, "../uploads/posts", file.name);
+    try {
+      await fs.unlink(filePath);
+    } catch (error) {
+      console.error(`Error in deleting file: ${filePath}`, error);
+    }
+  });
+
+  await post.deleteOne();
+
+  res.json({ message: "Post deleted successfully!" });
+});
+
+
+
+router.patch("/:postId/like", auth, async (req, res) => {
+  const postId = req.params.postId;
+  const userId = req.user._id;
+
+  const post = await Post.findById(postId);
+  if (!post) return res.status(404).json({ message: "Post not found!" });
+
+  const alreadyLiked = post.likes.includes(userId);
+
+  const updatedPost = await Post.findByIdAndUpdate(
+    postId,
+    alreadyLiked
+      ? { $pull: { likes: userId } }
+      : { $addToSet: { likes: userId } },
+    { new: true }
+  );
+
+  res.json({
+    message: alreadyLiked ? "Post unliked" : "Post liked",
+    likes: updatedPost.likes.length,
+  });
+});
+
+
+
+router.post("/:postId/comments", auth, async (req, res) => {
+  const postId = req.params.postId;
+  const userId = req.user._id;
+  const text = req.body.text;
+
+  if (!text)
+    return res.status(400).json({ message: "Comment text is required!" });
+
+  const newComment = {
+    user: userId,
+    text: text,
+  };
+
+  const post = await Post.findByIdAndUpdate(
+    postId,
+    { $push: { comments: newComment } },
+    { new: true }
+  );
+
+  res.status(201).json({
+    message: "Comment added successfully",
+    comment: post.comments[post.comments.length - 1],
+  });
 });
 
 module.exports = router;
