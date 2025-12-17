@@ -105,4 +105,30 @@ router.delete("/:postId", auth, async (req, res) => {
   res.json({ message: "Post deleted successfully!" });
 });
 
+
+
+router.patch("/:postId/like", auth, async (req, res) => {
+  const postId = req.params.postId;
+  const userId = req.user._id;
+
+  const post = await Post.findById(postId);
+  if (!post) return res.status(404).json({ message: "Post not found!" });
+
+  const alreadyLiked = post.likes.includes(userId);
+
+  const updatedPost = await Post.findByIdAndUpdate(
+    postId,
+    alreadyLiked
+      ? { $pull: { likes: userId } }
+      : { $addToSet: { likes: userId } },
+    { new: true }
+  );
+
+  res.json({
+    message: alreadyLiked ? "Post unliked" : "Post liked",
+    likes: updatedPost.likes.length,
+  });
+});
+
+
 module.exports = router;
