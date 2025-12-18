@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 
 const userRoutes = require("./routes/users");
 const postRoutes = require("./routes/posts");
+const chatRoutes = require("./routes/chats");
 
 const logger = require("./config/logger");
 
@@ -29,6 +30,7 @@ app.use(express.json());
 
 app.use("/api/user", userRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/chats", chatRoutes);
 
 // Custom Error Handler
 app.use((error, req, res, next) => {
