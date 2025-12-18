@@ -157,4 +157,60 @@ router.post("/:postId/comments", auth, async (req, res) => {
   });
 });
 
+
+router.post("/:postId/comments/:commentId/replies", auth, async (req, res) => {
+  const { postId, commentId } = req.params;
+  const userId = req.user._id;
+  const text = req.body.text;
+
+  if (!text)
+    return res.status(400).json({ message: "Comment text is required!" });
+
+  const newReply = {
+    user: userId,
+    text: text,
+  };
+
+  const post = await Post.findOneAndUpdate(
+    { _id: postId, "comments._id": commentId },
+    { $push: { "comments.$.replies": newReply } },
+    { new: true }
+  );
+
+  const comment = post.comments.id(commentId); // .id() is method of mongoose
+
+  res.status(201).json({
+    message: "Reply added successfully",
+    reply: comment.replies[comment.replies.length - 1],
+  });
+});
+
+
+router.delete("/:postId/comments/:commentId", auth, async (req, res) => {
+  const { postId, commentId } = req.params;
+  const userId = req.user._id;
+
+  const post = await Post.findOneAndUpdate(
+    {
+      _id: postId,
+      $or: [
+        { user: userId },
+        { "comments._id": commentId, "comments.user": userId },
+      ],
+    },
+    { $pull: { comments: { _id: commentId } } },
+    { new: true }
+  );
+
+  if (!post)
+    return res
+      .status(403)
+      .json({ message: "Unauthorized or Post/Comment not found!" });
+
+  res.status(201).json({
+    message: "Comment deleted successfully",
+    comments: post.comments,
+  });
+});
+
 module.exports = router;
