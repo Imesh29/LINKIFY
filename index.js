@@ -66,6 +66,16 @@ io.on("connection", (socket) => {
     //io.emit("getMessage",data);
     io.to(data.chatId).emit("getMessage", data);
   });
+
+  socket.on("typing", ({ chatId,username }) => {
+    socket
+      .to(chatId)
+      .emit("showTyping", `${username} is typing...`);
+  });
+
+  socket.on("stopTyping", ({ chatId,username}) => {
+    socket.to(chatId).emit("hideTyping", username);
+  });
 });
 
 server.listen(PORT, () => console.log(`Server is running on port ${PORT}...`));
