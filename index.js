@@ -56,11 +56,16 @@ app.use((error, req, res, next) => {
 io.on("connection", (socket) => {
   console.log("A user connected");
 
+  socket.on("joinRoom", (chatId) => {
+    socket.join(chatId);
+    console.log(`User ${socket.id} joined room: ${chatId}`);
+  });
   socket.on("sendMessage", (data) =>{
-    console.log("New message from frontend:",data);
-
-    socket.emit("getMessage",data);
-  })
-})
+    console.log("New message from frontend:", data);
+  
+    //io.emit("getMessage",data);
+    io.to(data.chatId).emit("getMessage", data);
+  });
+});
 
 server.listen(PORT, () => console.log(`Server is running on port ${PORT}...`));

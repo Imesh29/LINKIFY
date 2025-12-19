@@ -21,12 +21,13 @@ chatFrm.addEventListener("submit", (event) => {
   event.preventDefault();
 
   socket.emit("sendMessage", {
-    userId: username.value,
+    sender: { _id: 123, username: username.value },
     content: input.value,
+    createdAt: new Date(),
+    status: "sent",
     chatId: chatId,
   });
 
-  socket.emit("stopTyping", { chatId: chatId, username: username.value });
   input.value = "";
 });
 
@@ -70,21 +71,15 @@ function formatTime(timestamp) {
 input.addEventListener("input", () => {
   if (input.value !== "") {
     // Write here code for emit the typing event
-    socket.emit("typing", { chatId: chatId, username: username.value });
   }
   clearTimeout(typingTimeout);
   typingTimeout = setTimeout(() => {
     // Write here code for emit the stopTyping event
-    socket.emit("stopTyping", { chatId: chatId, username: username.value });
   }, 2000); // Stop typing after 2 seconds of inactivity
 });
 
-socket.on("showTyping", (message) => {
-  // Add this line to show Typing... message
-  typingIndicator.innerText = message;
-});
+// Add this line to show Typing... message
+typingIndicator.innerText = message;
 
-socket.on("hideTyping", (username) => {
-  // Add this line to stop Typing... message
-  typingIndicator.innerText = "";
-});
+// Add this line to stop Typing... message
+typingIndicator.innerText = "";
