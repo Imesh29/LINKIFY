@@ -109,4 +109,23 @@ router.post("/sendMessages", auth, async (req, res) => {
 });
 
 
+router.post("/createGroup", auth, async (req, res) => {
+  const userId = req.user._id;
+  const { participants, groupName } = req.body;
+
+  if (!participants)
+    return res.status(400).json({ message: "Participants are required!" });
+
+  const chat = new Chat({
+    participants: [...participants, userId],
+    groupName: groupName,
+    isGroup: true,
+    admins: [userId],
+  });
+  await chat.save();
+
+  res.status(201).json(chat);
+});
+
+
 module.exports = router;
