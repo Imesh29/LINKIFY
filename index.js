@@ -133,6 +133,42 @@ io.on("connection", (socket) => {
       }  
   });  
 
+  socket.on("markMessagesAsSeen", async (chatId) => {
+    const unseenMessages = await Message.find({
+      chatId: chatId,
+      sender: { $ne: userId },
+      status: "delivered",
+    }).select("_id sender");
+
+    if (unseenMessages.length > 0) {
+      await Message.updateMany(
+        {
+          chatId: chatId,
+          sender: { $ne: userId },
+          status: "delivered",
+        },
+        { $set: { status: "seen" } }
+      );
+
+      const senderIds = [
+        ...new Set(unseenMessages.map((msg) => msg.sender.toString())),
+      ];
+
+      for (const sender of senderIds) {
+        const sockets = onlineUsers.get(sender);
+
+        if (sockets) {
+          sockets.forEach((socketId) => {
+            io.to(socketId).emit("messageSeen", {
+              chatId: chatId,
+              seenBy: userId,
+            });
+          });
+        }
+      }
+    }
+  });  
+
   socket.on("joinRoom", (chatId) => {
     socket.join(chatId);
     console.log(`User ${socket.id} joined room: ${chatId}`);
