@@ -20,9 +20,11 @@
   "homepage": "https://github.com/Imesh29/LINKIFY#readme",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "compression": "^1.8.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.1",
     "multer": "^1.4.5-lts.1",
