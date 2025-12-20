@@ -11,6 +11,18 @@ const messageSchema = new mongoose.Schema(
             enum: ["sent", "delivered", "seen"],
             default: "sent",
         },
+        deliveryStatus: [
+            {
+                user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+                status: {
+                    type: String,
+                    enum: ["sent", "delivered", "seen"],
+                    default: "sent",
+                },
+                deliveredAt: { type: Date },
+                seenAt: { type: Date },
+            },
+        ],
     },
     { timestamps: true }
 );
