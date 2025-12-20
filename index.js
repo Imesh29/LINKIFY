@@ -79,10 +79,59 @@ io.use((socket, next) => {
 
 io.on("connection", (socket) => {
   console.log("A user connected");
+  const userId = socket.user._id
 
   socket.emit("userData", socket.user);
-  onlineUsers.set(socket.user._id,socket.id);
+  if(!onlineUsers.has(userId)){
+    onlineUsers.set(userId,new Set());
+
+  }
+  onlineUsers.get(userId).add(socket.id)
   console.log("Online users", onlineUsers);
+
+  socket.on("markGroupMessagesAsDelivered", async () => {
+    //Find all the chat messages in which our user is available
+    const chatIds = await Chat.find({
+      participants: userId,
+    }).distinct("_id");
+
+    const undeliveredMessage = await Message.find({
+      chatId: { $in: chatIds },
+      status: "sent",
+      sender: { $ne: userId }
+     }).select("_id chatId sender");
+
+    if (undeliveredMessage.length > 0) {
+      await Message.updateMany({_id: {$in: undeliveredMessage.map((msg) => msg._id) }}, {$set: {status:
+      "delivered"}})
+    } 
+
+    // Step 1: Group chatIds by sender
+      const groupedChatIds = undeliveredMessage.reduce((acc, msg) => {
+        if (!acc[msg.sender]) {
+          acc[msg.sender] = new Set();
+        }
+        acc[msg.sender].add(msg.chatId.toString());
+        return acc;
+      }, {});
+
+      // Convert Sets to Array
+      for (const sender in groupedChatIds) {
+        groupedChatIds[sender] = [...groupedChatIds[sender]];
+      }
+
+       // Step 2: Send event to online users only
+      for (const senderId in groupedChatIds) {
+        const sockets = onlineUsers.get(senderId);
+        const chatIds = groupedChatIds[senderId];
+
+        if (sockets) {
+          sockets.forEach((socketId) => {
+            io.to(socketId).emit("messageStatusUpdated", { chatIds });
+          });
+        }
+      }  
+  });  
 
   socket.on("joinRoom", (chatId) => {
     socket.join(chatId);
@@ -105,7 +154,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    /*const recipients = chat.participants.filter(
+    const recipients = chat.participants.filter(
       (id) => id.toString() !== userId
     );
 
@@ -119,13 +168,14 @@ io.on("connection", (socket) => {
           deliveredAt: online ? new Date() : null,
         };
       });
-    }*/
+    }
 
     const newMessage = new Message({
       chatId: chat._id,
       sender: userId,
       content,
-      
+      status: onlineUsers.has(recipients[0].toString()) ? "delivered" : "sent",
+      deliveryStatus: deliveryStatus,
     });
 
     await newMessage.save();
@@ -142,7 +192,12 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () =>{
-    onlineUsers.delete(socket.user._id);
+    onlineUsers.get(userId).delete(socket.id);
+
+    if(onlineUsers.get(userId).size === 0){
+      onlineUsers.delete(userId);
+
+    }
 
     console.log("Online users", onlineUsers);
   })
